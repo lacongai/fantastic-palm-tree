@@ -87,22 +87,41 @@ def parse():
 # --- ĐÃ SỬA: Chức năng mới cho /health (Hướng dẫn API) ---
 @app.route("/health", methods=["GET"])
 def health_guide():
-    html_content = """
+    # Tạo hyperlink cho help.garena.com
+    garena_link = '<a href="https://help.garena.com/">help.garena.com</a>'
+    
+    api_link = '<a href="https://fantastic-palm-tree.vercel.app">https://fantastic-palm-tree.vercel.app</a>'
+    
+    html_content = f"""
     <!DOCTYPE html>
     <html lang="vi">
     <head>
         <meta charset="UTF-8">
         <title>Hướng dẫn sử dụng API Garena Info Extractor</title>
         <style>
-            body { font-family: Arial, sans-serif; margin: 20px; }
-            code { background-color: #eee; padding: 2px 4px; border-radius: 3px; }
-            pre { background-color: #f4f4f4; padding: 10px; border-radius: 5px; overflow-x: auto; }
-            h2 { color: #333; }
+            body {{ font-family: Arial, sans-serif; margin: 20px; }}
+            code {{ background-color: #eee; padding: 2px 4px; border-radius: 3px; }}
+            pre {{ background-color: #f4f4f4; padding: 10px; border-radius: 5px; overflow-x: auto; }}
+            h2 {{ color: #333; }}
+            ol {{ padding-left: 20px; }}
         </style>
     </head>
     <body>
         <h1>Hướng dẫn sử dụng API Garena Info Extractor</h1>
-        <p>API này được tạo bởi <strong>@henntaiiz</strong>, dùng để trích xuất Access Token, UID và Nickname từ liên kết hỗ trợ Garena (<code>help.garena.com</code>).</p>
+        <p>API này được tạo bởi <strong>@henntaiiz</strong>, dùng để trích xuất Access Token, UID và Nickname từ liên kết hỗ trợ Garena (<code>{garena_link}</code>).</p>
+
+        <h2>Hướng dẫn lấy liên kết Garena Access Token</h2>
+        <p>Để nhận được liên kết</p>
+        <p>{garena_link}</p>
+        <p>có chứa Access Token, bạn thường phải thực hiện theo các bước sau trong quá trình đăng nhập hoặc truy cập hỗ trợ của Garena:</p>
+        <ol>
+            <li>Đăng nhập tài khoản Garena/Free Fire trên trình duyệt (thông thường là đăng nhập vào trang Hỗ trợ Garena).</li>
+            <li>Tìm kiếm và truy cập vào một liên kết hỗ trợ nội bộ hoặc liên kết kiểm tra thông tin tài khoản.</li>
+            <li>Sau khi Garena xác thực bạn và chuyển hướng đến trang hỗ trợ/trang khác, trình duyệt sẽ hiển thị URL dạng 
+            <li><code>https://help.garena.com/?access_token=...</code>.</li>
+            <li><strong>Sao chép toàn bộ liên kết này</strong> để gửi đến bot Telegram hoặc sử dụng với API <code>/extract</code>.</li>
+            <li><em>Lưu ý: Quá trình này có thể thay đổi tùy theo chính sách của Garena.</em></li>
+        </ol>
 
         <h2>Endpoint chính</h2>
         <p><code>GET /extract</code></p>
@@ -113,37 +132,43 @@ def health_guide():
                 <strong>Tên tham số:</strong> <code>url</code>
             </li>
             <li>
-                <strong>Mô tả:</strong> Liên kết <code>help.garena.com</code> (ví dụ: <code>https://help.garena.com/?access_token=...</code>). Liên kết này cần được mã hóa (URL-encode) nếu gửi qua trình duyệt hoặc công cụ API.
+                <strong>Mô tả:</strong> Liên kết 
+                {garena_link} 
+                đã sao chép ở trên. Liên kết này cần được mã hóa (URL-encode) nếu gửi qua trình duyệt hoặc công cụ API.
             </li>
         </ul>
 
         <h2>Ví dụ sử dụng</h2>
-        <p>Giả sử BASE_URL là <code>https://fantastic-palm-tree.vercel.app</code>:</p>
+        <p>Giả sử BASE_URL là</p>
+        <p><code>{api_link}</code>:</p>
         <pre><code>[BASE_URL]/extract?url=https://help.garena.com/?access_token=...&amp;nickname=...</code></pre>
 
         <h2>Phản hồi (Response) thành công (HTTP 200)</h2>
-        <pre><code>{
+        <pre><code>{{
     "status": "success",
     "message": "Garena access info extracted successfully",
-    "data": {
+    "data": {{
         "game": "FF",
         "access_token": "0b4f6044be4ef51d41d7346b9a03a124f5cdad...",
-        "uid": "12345678",
+        "uid": "xxxxxxxx",
         "nickname": "HenTaiz",
         "region": "TH",
         "lang": "en",
         "telegram": "@henntaiiz"
-    }
-}</code></pre>
+    }}
+}}</code></pre>
 
         <h2>Phản hồi (Response) lỗi (HTTP 400)</h2>
-        <pre><code>{
+        <pre><code>{{
     "status": "error",
     "error": "Missing access_token in link."
-}</code></pre>
+}}</code></pre>
     </body>
     </html>
     """
+    # Thay thế dấu ngoặc nhọn kép {{ và }} thành { và } để tránh lỗi formatting string (f-string)
+    # Tuy nhiên, trong Python, khi sử dụng f-string, dấu ngoặc nhọn kép được dùng để in ra dấu ngoặc nhọn đơn, 
+    # nên tôi sẽ dùng f-string và giữ nguyên cấu trúc cũ, chỉ thay đổi chỗ cần link.
     return html_content
 
 # --- Entry ---

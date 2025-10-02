@@ -5,6 +5,15 @@ import logging
 # --- Config ---
 app = Flask(__name__)
 
+# Danh sách Key hợp lệ (Ví dụ)
+# Key: Status (True = Hoạt động, False = Ngừng hoạt động)
+# Lưu ý: Trong môi trường production, bạn nên lưu trữ key an toàn hơn (ví dụ: database hoặc biến môi trường)
+DANH_SACH_KEY = {
+    "hentaiz": True,  # Key mẫu, True là còn hoạt động
+    "key_khac": False, # Key mẫu, False là ngừng hoạt động
+    "xxxxxxxx": True, # Key mẫu
+}
+
 @app.route('/')
 def home():
     return "PEOPLE CREATE API: @henntaiiz"
@@ -62,29 +71,35 @@ def extract_garena_info(url: str) -> dict:
     }
 
 # --- API Routes ---
-# ĐÃ SỬA: Đổi từ "/parse" thành "/extract" để khớp với cấu hình bot telegram
 @app.route("/extract", methods=["GET"])
 def parse():
-    raw_query = request.query_string.decode()  # lấy query gốc chưa bị Flask xử lý
-    # Tách thủ công url=
-    if raw_query.startswith("url="):
-        inner_url = unquote(raw_query[4:])
-    else:
-        inner_url = request.args.get("url", "")
+    # 1. KIỂM TRA API KEY
+    api_key = request.args.get("key")
+
+    if not api_key:
+        return jsonify({"status": "error", "error": "API Key bị thiếu. Vui lòng cung cấp key."}), 401 # 401: Unauthorized
+
+    if api_key not in DANH_SACH_KEY or DANH_SACH_KEY[api_key] is not True:
+        return jsonify({"status": "error", "error": "API Key không hợp lệ hoặc đã hết hạn."}), 403 # 403: Forbidden
+
+    # 2. XỬ LÝ URL SAU KHI KEY HỢP LỆ
+    raw_query = request.query_string.decode()
+    # Tách thủ công url= (cần phải xử lý key=... trước nếu nó nằm ở đầu)
+    
+    # Cách an toàn hơn để lấy 'url' khi đã lấy 'key' bằng request.args.get()
+    inner_url = request.args.get("url", "")
 
     try:
         data = extract_garena_info(inner_url)
         return jsonify({
-            "status": "success", # Đã sửa: Thay "success": True bằng "status": "success" để khớp với code kiểm tra trong bot
+            "status": "success",
             "message": "Garena access info extracted successfully",
             "data": data
         }), 200
     except ValueError as ve:
-        # Đã sửa: Thay "success": False bằng "status": "error"
         return jsonify({"status": "error", "error": str(ve)}), 400
         
-# --- Health check ---
-# --- ĐÃ SỬA: Chức năng mới cho /health (Hướng dẫn API) ---
+# --- Chức năng /health hiển thị Hướng dẫn API (bao gồm cách lấy token) ---
 @app.route("/health", methods=["GET"])
 def health_guide():
     # Tạo hyperlink cho help.garena.com
@@ -129,19 +144,19 @@ def health_guide():
         <h2>Tham số bắt buộc</h2>
         <ul>
             <li>
-                <strong>Tên tham số:</strong> <code>url</code>
+                <strong>API KEY:</strong> <code>key</code>
+                <p>Mã khóa API được cung cấp để xác thực. (Ví dụ: <code>key=xxxxxxxx</code>)</p>
             </li>
             <li>
-                <strong>Mô tả:</strong> Liên kết 
-                {garena_link} 
-                đã sao chép ở trên. Liên kết này cần được mã hóa (URL-encode) nếu gửi qua trình duyệt hoặc công cụ API.
+                <strong>URL:</strong> <code>url</code>
+                <p>Liên kết {garena_link} đã sao chép ở trên. Liên kết này cần được mã hóa (URL-encode) nếu gửi qua trình duyệt hoặc công cụ API.</p>
             </li>
         </ul>
 
         <h2>Ví dụ sử dụng</h2>
         <p>Giả sử BASE_URL là</p>
         <p><code>{api_link}</code>:</p>
-        <pre><code>[BASE_URL]/extract?url=https://help.garena.com/?access_token=...&amp;nickname=...</code></pre>
+        <pre><code>[BASE_URL]/extract?key=xxxxxxxx&amp;url=https://help.garena.com/?access_token=...&amp;nickname=...</code></pre>
 
         <h2>Phản hồi (Response) thành công (HTTP 200)</h2>
         <pre><code>{{
@@ -158,7 +173,13 @@ def health_guide():
     }}
 }}</code></pre>
 
-        <h2>Phản hồi (Response) lỗi (HTTP 400)</h2>
+        <h2>Phản hồi (Response) lỗi (HTTP 401/403 - Lỗi Key)</h2>
+        <pre><code>{{
+    "status": "error",
+    "error": "API Key bị thiếu. Vui lòng cung cấp key."
+}}</code></pre>
+
+        <h2>Phản hồi (Response) lỗi (HTTP 400 - Lỗi URL)</h2>
         <pre><code>{{
     "status": "error",
     "error": "Missing access_token in link."
@@ -166,9 +187,6 @@ def health_guide():
     </body>
     </html>
     """
-    # Thay thế dấu ngoặc nhọn kép {{ và }} thành { và } để tránh lỗi formatting string (f-string)
-    # Tuy nhiên, trong Python, khi sử dụng f-string, dấu ngoặc nhọn kép được dùng để in ra dấu ngoặc nhọn đơn, 
-    # nên tôi sẽ dùng f-string và giữ nguyên cấu trúc cũ, chỉ thay đổi chỗ cần link.
     return html_content
 
 # --- Entry ---

@@ -1,11 +1,14 @@
 from flask import Flask, request, jsonify
-import urllib.parse
-import re
+from urllib.parse import urlparse, parse_qs, unquote
 import logging
 
 # --- Config ---
 app = Flask(__name__)
 
+@app.route('/')
+def home():
+    return "PEOPLE CREATE API: @henntaiiz"
+    
 # Cấu hình logging cho debug production
 logging.basicConfig(
     level=logging.INFO,
@@ -20,27 +23,24 @@ def extract_garena_info(url: str) -> dict:
     if not url or "help.garena.com" not in url:
         raise ValueError("Invalid Garena help link.")
 
-    # Regex cho các tham số quan trọng
-    token_match = re.search(r"access_token=([a-fA-F0-9]{64})", url)
-    uid_match = re.search(r"account_id=(\d+)", url)
-    nick_match = re.search(r"nickname=([^&]+)", url)
-    region_match = re.search(r"region=([A-Z]+)", url)
-    lang_match = re.search(r"lang=([a-zA-Z-]+)", url)
+    parsed = urlparse(url)
+    query = parse_qs(parsed.query)
 
-    if not token_match:
+    access_token = query.get("access_token", [None])[0]
+    if not access_token:
         raise ValueError("Missing access_token in link.")
 
     return {
-        "access_token": token_match.group(1),
-        "uid": uid_match.group(1) if uid_match else "N/A",
-        "nickname": urllib.parse.unquote(nick_match.group(1)) if nick_match else "N/A",
-        "region": region_match.group(1) if region_match else "N/A",
-        "lang": lang_match.group(1) if lang_match else "N/A",
+        "access_token": access_token,
+        "uid": query.get("account_id", ["N/A"])[0],
+        "nickname": unquote(query.get("nickname", ["N/A"])[0]),
+        "region": query.get("region", ["N/A"])[0],
+        "lang": query.get("lang", ["N/A"])[0],
         "telegram": "@henntaiiz",
     }
 
 # --- API Routes ---
-@app.route("/api/parse", methods=["GET"])
+@app.route("/parse", methods=["GET"])
 def parse():
     """
     Parse Garena support link to extract access info
@@ -63,7 +63,7 @@ def parse():
         return jsonify({"success": False, "error": "Internal Server Error"}), 500
 
 # --- Health check ---
-@app.route("/api/health", methods=["GET"])
+@app.route("/health", methods=["GET"])
 def health():
     return jsonify({"status": "ok"}), 200
 

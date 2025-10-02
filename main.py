@@ -20,48 +20,67 @@ def extract_garena_info(url: str) -> dict:
     """
     Extract Garena access info from help.garena.com URL
     """
-    if not url or "help.garena.com" not in url:
-        raise ValueError("Invalid Garena help link.")
+    if not url:
+        raise ValueError("Missing url parameter.")
 
+    # Parse lớp ngoài
     parsed = urlparse(url)
     query = parse_qs(parsed.query)
 
-    access_token = query.get("access_token", [None])[0]
+    # Nếu query ngoài có param "url" -> parse tiếp lớp trong
+    if "url" in query:
+        inner_url = query.get("url", [None])[0]
+        if not inner_url or "help.garena.com" not in inner_url:
+            raise ValueError("Invalid Garena help link.")
+        parsed_inner = urlparse(inner_url)
+        inner_query = parse_qs(parsed_inner.query)
+    else:
+        # Không có lớp ngoài, parse trực tiếp
+        if "help.garena.com" not in url:
+            raise ValueError("Invalid Garena help link.")
+        inner_query = query
+
+    # Lấy các giá trị từ lớp trong
+    access_token = inner_query.get("access_token", [None])[0]
     if not access_token:
         raise ValueError("Missing access_token in link.")
 
+    account_id = inner_query.get("account_id", ["N/A"])[0]
+    nickname = unquote(inner_query.get("nickname", ["N/A"])[0])
+    region = inner_query.get("region", ["N/A"])[0]
+    lang = inner_query.get("lang", ["N/A"])[0]
+    game = inner_query.get("game", ["N/A"])[0]
+
     return {
+        "game": game,
         "access_token": access_token,
-        "uid": query.get("account_id", ["N/A"])[0],
-        "nickname": unquote(query.get("nickname", ["N/A"])[0]),
-        "region": query.get("region", ["N/A"])[0],
-        "lang": query.get("lang", ["N/A"])[0],
+        "uid": account_id,
+        "nickname": nickname,
+        "region": region,
+        "lang": lang,
         "telegram": "@henntaiiz",
     }
 
 # --- API Routes ---
 @app.route("/parse", methods=["GET"])
 def parse():
-    """
-    Parse Garena support link to extract access info
-    Example: /api/parse?url=https://help.garena.com/?access_token=...
-    """
-    url = request.args.get("url", "").strip()
+    raw_query = request.query_string.decode()  # lấy query gốc chưa bị Flask xử lý
+    # Tách thủ công url=
+    if raw_query.startswith("url="):
+        inner_url = unquote(raw_query[4:])
+    else:
+        inner_url = request.args.get("url", "")
+
     try:
-        data = extract_garena_info(url)
-        response = {
+        data = extract_garena_info(inner_url)
+        return jsonify({
             "success": True,
             "message": "Garena access info extracted successfully",
             "data": data
-        }
-        return jsonify(response), 200
+        }), 200
     except ValueError as ve:
-        logging.warning(f"Validation error: {ve}")
         return jsonify({"success": False, "error": str(ve)}), 400
-    except Exception as e:
-        logging.error(f"Unexpected error: {e}", exc_info=True)
-        return jsonify({"success": False, "error": "Internal Server Error"}), 500
-
+        
 # --- Health check ---
 @app.route("/health", methods=["GET"])
 def health():
